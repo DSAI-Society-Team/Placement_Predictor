@@ -1,0 +1,6 @@
+__pycache__/
+.pytest_cache/
+.venv/
+artifacts/
+placement_train.csv
+*.py[cod]
