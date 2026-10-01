@@ -28,6 +28,13 @@ The script recognizes common variants of the notebook's input columns, such as
 the training split. The primary Random Forest model and its feature schema are
 saved to `artifacts/placement_model.joblib`.
 
+The model comparison reports both the stratified holdout metrics and five-fold
+cross-validation metrics computed only within the training partition. Use the
+held-out split as the final comparison; cross-validation is for model stability
+and selection, not a substitute for an independent external cohort. The
+logistic-regression baseline standardizes features and uses `C=10`, selected
+with training-only cross-validation to improve its ROC-AUC and convergence.
+
 ## Run the app
 
 ```powershell
@@ -38,3 +45,16 @@ The app displays a probability estimate and compares hypothetical profile
 changes for communication skills, backlogs, and projects. These are model-based
 associations, not guarantees or causal estimates. Predictions are only as
 reliable as the dataset used to train the model.
+
+## Standalone ROC-AUC report
+
+Open `index.html` in a browser to inspect the reproducible stratified 80/20
+holdout evaluation without running Streamlit or a server. It embeds the 9,000
+held-out actual labels and predicted probabilities for Logistic Regression,
+Random Forest, and LightGBM, then calculates ROC-AUC, average precision,
+thresholded metrics, confusion matrices, and ROC points in the browser.
+
+Use **Download all held-out scores CSV** to give another AI or tool the actual
+labels and per-model probabilities needed to independently recalculate every
+metric. **Download this model's ROC points CSV** exports the curve thresholds
+and rates. The original dataset and student attributes are not included.
