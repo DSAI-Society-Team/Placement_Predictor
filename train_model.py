@@ -11,7 +11,9 @@ from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 from placement_predictor import (
     canonicalize_columns,
@@ -64,7 +66,9 @@ def train(data_path: Path, target_name: str | None, output_path: Path) -> None:
         raise ValueError("The CSV has no usable feature columns after preprocessing.")
 
     models = {
-        "Logistic Regression (Baseline)": LogisticRegression(max_iter=1000),
+        "Logistic Regression (Scaled)": make_pipeline(
+            StandardScaler(), LogisticRegression(max_iter=3000, C=10)
+        ),
         "Random Forest (Primary)": RandomForestClassifier(
             n_estimators=100, random_state=42, n_jobs=-1
         ),
@@ -73,8 +77,21 @@ def train(data_path: Path, target_name: str | None, output_path: Path) -> None:
         ),
     }
 
+    cross_validation = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     results: list[dict[str, str | float]] = []
     for name, model in models.items():
+        cv_scores = cross_validate(
+            model,
+            x_train,
+            y_train,
+            cv=cross_validation,
+            scoring={
+                "roc_auc": "roc_auc",
+                "accuracy": "accuracy",
+                "f1": "f1",
+            },
+            n_jobs=1,
+        )
         model.fit(x_train, y_train)
         probabilities = model.predict_proba(x_test)[:, list(model.classes_).index(1)]
         predictions = (probabilities >= 0.5).astype(int)
@@ -84,6 +101,11 @@ def train(data_path: Path, target_name: str | None, output_path: Path) -> None:
                 "Accuracy": round(accuracy_score(y_test, predictions), 4),
                 "F1-Score": round(f1_score(y_test, predictions, zero_division=0), 4),
                 "ROC-AUC": round(roc_auc_score(y_test, probabilities), 4),
+                "CV Accuracy (mean)": round(cv_scores["test_accuracy"].mean(), 4),
+                "CV Accuracy (std)": round(cv_scores["test_accuracy"].std(), 4),
+                "CV F1 (mean)": round(cv_scores["test_f1"].mean(), 4),
+                "CV ROC-AUC (mean)": round(cv_scores["test_roc_auc"].mean(), 4),
+                "CV ROC-AUC (std)": round(cv_scores["test_roc_auc"].std(), 4),
             }
         )
 

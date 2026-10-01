@@ -176,8 +176,19 @@ def prepare_model_input(
     feature_columns: Sequence[str],
     medians: Mapping[str, float],
 ) -> pd.DataFrame:
-    matrix = model_matrix(pd.DataFrame([dict(student_data)]))
+    prepared = canonicalize_columns(pd.DataFrame([dict(student_data)]))
+    matrix = model_matrix(prepared)
     matrix = matrix.reindex(columns=list(feature_columns), fill_value=0)
+    for category_column in ("Gender", "Degree", "Branch"):
+        if category_column not in prepared.columns:
+            continue
+        value = str(prepared.iloc[0][category_column])
+        prefix = f"{category_column}_"
+        for feature in feature_columns:
+            if feature.startswith(prefix):
+                matrix.at[matrix.index[0], feature] = float(
+                    value == feature[len(prefix) :]
+                )
     return matrix.fillna(pd.Series(medians)).fillna(0)
 
 

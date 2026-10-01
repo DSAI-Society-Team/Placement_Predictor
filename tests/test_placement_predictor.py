@@ -77,6 +77,35 @@ class PlacementPredictorTests(unittest.TestCase):
         self.assertGreaterEqual(probability, 0.0)
         self.assertLessEqual(probability, 1.0)
 
+    def test_prediction_encodes_categorical_values_against_training_schema(self):
+        training = pd.DataFrame(
+            {
+                "CGPA": [6.0, 8.0, 7.0, 9.0],
+                "Gender": ["Female", "Male", "Female", "Male"],
+                "Degree": ["B.Sc", "B.Tech", "BCA", "MCA"],
+                "Branch": ["CSE", "Civil", "ECE", "IT"],
+            }
+        )
+        matrix = model_matrix(training)
+        labels = [0, 1, 0, 1]
+        model = RandomForestClassifier(n_estimators=5, random_state=42).fit(
+            matrix, labels
+        )
+        feature_columns = matrix.columns.tolist()
+        medians = matrix.median().fillna(0).to_dict()
+        profile = {"CGPA": 8.5, "Gender": "Male", "Degree": "B.Tech", "Branch": "IT"}
+
+        actual = prepare_model_input(profile, feature_columns, medians)
+        self.assertEqual(actual.loc[0, "Gender_Male"], 1.0)
+        self.assertEqual(actual.loc[0, "Degree_B.Tech"], 1.0)
+        self.assertEqual(actual.loc[0, "Branch_IT"], 1.0)
+        probability = placement_probability(
+            model, profile, feature_columns, medians
+        )
+        self.assertAlmostEqual(
+            probability, float(model.predict_proba(actual)[0][1])
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
